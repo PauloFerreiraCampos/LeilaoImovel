@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consulta de Imóveis</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --tx:#1d2330; --mut:#667085; --bd:#e3e6eb;
+    --pri:#1f5fbf; --pri-l:#e8f0fc; --ok:#137a3f; --ok-l:#e5f5ec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+  header{background:var(--card);border-bottom:1px solid var(--bd);padding:16px 24px;display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline}
+  header h1{font-size:20px;margin:0}
+  header .sub{color:var(--mut);font-size:13px}
+  main{max-width:1400px;margin:0 auto;padding:20px 24px 48px}
+  .filtros{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+  .filtros .busca{grid-column:1/-1}
+  label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut);font-weight:600}
+  input,select{font:inherit;color:var(--tx);padding:7px 9px;border:1px solid var(--bd);border-radius:6px;background:#fff;width:100%}
+  input:focus,select:focus{outline:2px solid var(--pri-l);border-color:var(--pri)}
+  .linha2{display:flex;gap:6px}
+  .chk{flex-direction:row;align-items:center;gap:8px;align-self:end;padding-bottom:8px;color:var(--tx);font-weight:500}
+  .chk input{width:auto}
+  .acoes{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  button{font:inherit;padding:7px 14px;border-radius:6px;border:1px solid var(--bd);background:#fff;cursor:pointer}
+  button:hover{background:var(--bg)}
+  button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+  button.pri:hover{filter:brightness(.95)}
+  .resumo{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
+  .kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 16px;min-width:160px}
+  .kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+  .kpi span{font-size:12px;color:var(--mut)}
+  .tabela{background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:auto}
+  table{border-collapse:collapse;width:100%;min-width:1100px}
+  th,td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}
+  th{position:sticky;top:0;background:#fafbfc;font-size:12px;color:var(--mut);cursor:pointer;user-select:none;white-space:nowrap}
+  th[data-ord]::after{content:" ↕";opacity:.35}
+  th.asc::after{content:" ▲";opacity:1}
+  th.desc::after{content:" ▼";opacity:1}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  tr:hover td{background:#fafbfc}
+  .tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;background:var(--pri-l);color:var(--pri);white-space:nowrap}
+  .tag.ok{background:var(--ok-l);color:var(--ok)}
+  .desc{color:var(--mut);font-size:12px;max-width:340px}
+  a{color:var(--pri)}
+  .pag{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap;color:var(--mut)}
+  .vazio{padding:40px;text-align:center;color:var(--mut)}
+  .erro{background:#fdecec;color:#a11;border:1px solid #f5c2c2;padding:12px 16px;border-radius:8px;margin-bottom:16px}
+  .sucesso{background:var(--ok-l);color:var(--ok);border:1px solid #b7e1c7;padding:12px 16px;border-radius:8px;margin-bottom:16px}
+  dialog{border:1px solid var(--bd);border-radius:10px;padding:20px;max-width:480px;width:calc(100% - 32px);color:var(--tx)}
+  dialog::backdrop{background:rgba(16,24,40,.45)}
+  dialog h2{margin:0 0 12px;font-size:17px}
+  dialog p{margin:0 0 12px}
+  dialog .aviso{background:#fff6e5;border:1px solid #f3d9a4;color:#7a4b00;padding:10px 12px;border-radius:6px}
+  dialog .botoes{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  dialog .msg{color:#a11;font-size:13px;min-height:1em;margin-top:8px}
+  button.perigo{background:#b42318;border-color:#b42318;color:#fff}
+  button:disabled{opacity:.6;cursor:default}
+</style>
+</head>
+<body>
+<header>
+  <h1>Consulta de Imóveis</h1>
+  <span class="sub" id="atualizado">Carregando…</span>
+</header>
+<main>
+  <div id="erro"></div>
+
+  <section class="filtros" aria-label="Filtros">
+    <label class="busca">Busca livre (nº do imóvel, endereço, bairro, descrição…)
+      <input id="fBusca" type="search" placeholder="Ex.: apartamento 2 quartos centro">
+    </label>
+    <label>UF <select id="fUF"><option value="">Todas</option></select></label>
+    <label>Cidade <select id="fCidade"><option value="">Todas</option></select></label>
+    <label>Bairro <select id="fBairro"><option value="">Todos</option></select></label>
+    <label>Modalidade <select id="fModalidade"><option value="">Todas</option></select></label>
+    <label>Financiamento
+      <select id="fFin"><option value="">Todos</option><option>Sim</option><option>Não</option></select>
+    </label>
+    <label>Preço (R$)
+      <div class="linha2"><input id="fPrecoMin" type="number" min="0" placeholder="mín"><input id="fPrecoMax" type="number" min="0" placeholder="máx"></div>
+    </label>
+    <label>Desconto mínimo (%) <input id="fDesc" type="number" min="0" max="100" placeholder="ex.: 30"></label>
+    <label>Área privativa mín. (m²) <input id="fArea" type="number" min="0"></label>
+    <label class="chk"><input id="fFav" type="checkbox"> Somente favoritos</label>
+    <div class="acoes">
+      <button id="btLimpar">Limpar filtros</button>
+      <button id="btImportar">Importar CSV…</button>
+      <input id="arqCsv" type="file" accept=".csv,text/csv" hidden>
+      <button id="btCsv" class="pri">Exportar CSV</button>
+    </div>
+  </section>
+
+  <section class="resumo">
+    <div class="kpi"><b id="kQtd">0</b><span>imóveis encontrados</span></div>
+    <div class="kpi"><b id="kMedia">–</b><span>preço médio</span></div>
+    <div class="kpi"><b id="kDesc">–</b><span>desconto médio</span></div>
+    <div class="kpi"><b id="kMenor">–</b><span>menor preço</span></div>
+  </section>
+
+  <div class="tabela">
+    <table>
+      <thead><tr>
+        <th data-ord="NumeroImv">Nº Imóvel</th>
+        <th data-ord="UF">UF</th>
+        <th data-ord="Cidade">Cidade</th>
+        <th data-ord="Bairro">Bairro</th>
+        <th data-ord="Endereco">Endereço / Descrição</th>
+        <th data-ord="Preco">Preço</th>
+        <th data-ord="Avaliacao">Avaliação</th>
+        <th data-ord="Desconto">Desc.</th>
+        <th data-ord="AreaPrivativa">Área (m²)</th>
+        <th data-ord="Financiamento">Financ.</th>
+        <th data-ord="Modalidade">Modalidade</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="corpo"></tbody>
+    </table>
+  </div>
+
+  <div class="pag">
+    <span id="pagInfo"></span>
+    <span>
+      <select id="pagTam" style="width:auto"><option>25</option><option selected>50</option><option>100</option><option>250</option></select>
+      <button id="pagAnt">‹ Anterior</button>
+      <button id="pagProx">Próxima ›</button>
+    </span>
+  </div>
+</main>
+
+<dialog id="dlgImport">
+  <form method="dialog" id="frmImport">
+    <h2>Importar lista de imóveis</h2>
+    <p id="impResumo"></p>
+    <p class="aviso" id="impAviso"></p>
+    <label>Senha de importação
+      <input id="impSenha" type="password" autocomplete="current-password" required>
+    </label>
+    <div class="msg" id="impMsg"></div>
+    <div class="botoes">
+      <button type="button" id="impCancelar">Cancelar</button>
+      <button type="submit" id="impConfirmar" class="perigo">Excluir e importar</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="config.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const brl = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'});
+  const num = new Intl.NumberFormat('pt-BR', {maximumFractionDigits:2});
+  const norm = s => (s ?? '').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+  const esc = s => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let dados = [], filtrados = [], pagina = 0, ordem = {col:'Preco', dir:1};
+
+  const unicos = (arr, campo) => [...new Set(arr.map(r => r[campo]).filter(v => v != null && v !== ''))]
+    .sort((a,b) => a.toString().localeCompare(b.toString(), 'pt-BR'));
+
+  function preencher(sel, valores, rotuloTodos) {
+    const atual = sel.value;
+    sel.innerHTML = `<option value="">${rotuloTodos}</option>` + valores.map(v => `<option>${esc(v)}</option>`).join('');
+    sel.value = valores.includes(atual) ? atual : '';
+  }
+
+  // Combos em cascata: UF -> Cidade -> Bairro
+  function atualizarCombos() {
+    const uf = $('fUF').value, cid = $('fCidade').value;
+    const porUF = uf ? dados.filter(r => r.UF === uf) : dados;
+    preencher($('fCidade'), unicos(porUF, 'Cidade'), 'Todas');
+    const porCid = $('fCidade').value ? porUF.filter(r => r.Cidade === $('fCidade').value) : porUF;
+    preencher($('fBairro'), unicos(porCid, 'Bairro'), 'Todos');
+  }
+
+  function filtrar() {
+    const termos = norm($('fBusca').value).split(/\s+/).filter(Boolean);
+    const uf = $('fUF').value, cid = $('fCidade').value, bai = $('fBairro').value;
+    const mod = $('fModalidade').value, fin = norm($('fFin').value);
+    const pMin = parseFloat($('fPrecoMin').value), pMax = parseFloat($('fPrecoMax').value);
+    const dMin = parseFloat($('fDesc').value), aMin = parseFloat($('fArea').value);
+    const fav = $('fFav').checked;
+
+    filtrados = dados.filter(r =>
+      (!uf  || r.UF === uf) &&
+      (!cid || r.Cidade === cid) &&
+      (!bai || r.Bairro === bai) &&
+      (!mod || r.Modalidade === mod) &&
+      (!fin || norm(r.Financiamento) === fin) &&
+      (isNaN(pMin) || (r.Preco ?? 0) >= pMin) &&
+      (isNaN(pMax) || (r.Preco ?? 0) <= pMax) &&
+      (isNaN(dMin) || (r.Desconto ?? 0) >= dMin) &&
+      (isNaN(aMin) || (r.AreaPrivativa ?? 0) >= aMin) &&
+      (!fav || r.Favorito > 0) &&
+      termos.every(t => r._busca.includes(t))
+    );
+    ordenar();
+    pagina = 0;
+    render();
+  }
+
+  function ordenar() {
+    const {col, dir} = ordem;
+    filtrados.sort((a,b) => {
+      const x = a[col], y = b[col];
+      if (x == null) return 1; if (y == null) return -1;
+      return (typeof x === 'number' ? x - y : x.toString().localeCompare(y.toString(), 'pt-BR')) * dir;
+    });
+    document.querySelectorAll('th[data-ord]').forEach(th => {
+      th.classList.toggle('asc', th.dataset.ord === col && dir === 1);
+      th.classList.toggle('desc', th.dataset.ord === col && dir === -1);
+    });
+  }
+
+  function render() {
+    const tam = +$('pagTam').value;
+    const total = filtrados.length, paginas = Math.max(1, Math.ceil(total / tam));
+    pagina = Math.min(pagina, paginas - 1);
+    const fatia = filtrados.slice(pagina * tam, pagina * tam + tam);
+
+    $('corpo').innerHTML = fatia.length ? fatia.map(r => `
+      <tr>
+        <td>${esc(r.NumeroImv)}${r.Favorito > 0 ? ' ★' : ''}</td>
+        <td>${esc(r.UF)}</td>
+        <td>${esc(r.Cidade)}</td>
+        <td>${esc(r.Bairro)}</td>
+        <td>${esc(r.Endereco)}<div class="desc">${esc(r.Descricao)}</div></td>
+        <td class="n"><b>${r.Preco != null ? brl.format(r.Preco) : '–'}</b></td>
+        <td class="n">${r.Avaliacao != null ? brl.format(r.Avaliacao) : '–'}</td>
+        <td class="n">${r.Desconto != null ? num.format(r.Desconto) + '%' : '–'}</td>
+        <td class="n">${r.AreaPrivativa != null ? num.format(r.AreaPrivativa) : '–'}</td>
+        <td>${r.Financiamento ? `<span class="tag ${norm(r.Financiamento)==='sim'?'ok':''}">${esc(r.Financiamento)}</span>` : ''}</td>
+        <td>${esc(r.Modalidade)}</td>
+        <td>${r.LinkAcesso ? `<a href="${esc(r.LinkAcesso)}" target="_blank" rel="noopener">Abrir</a>` : ''}</td>
+      </tr>`).join('')
+      : `<tr><td colspan="12" class="vazio">${dados.length ? 'Nenhum imóvel encontrado com esses filtros.' : 'Nenhum dado carregado.'}</td></tr>`;
+
+    $('pagInfo').textContent = total ? `${pagina*tam+1}–${Math.min(total,(pagina+1)*tam)} de ${total.toLocaleString('pt-BR')}` : '';
+    $('pagAnt').disabled = pagina === 0;
+    $('pagProx').disabled = pagina >= paginas - 1;
+
+    const precos = filtrados.map(r => r.Preco).filter(v => v != null);
+    const descs = filtrados.map(r => r.Desconto).filter(v => v != null);
+    $('kQtd').textContent = total.toLocaleString('pt-BR');
+    $('kMedia').textContent = precos.length ? brl.format(precos.reduce((a,b)=>a+b,0)/precos.length) : '–';
+    $('kDesc').textContent = descs.length ? num.format(descs.reduce((a,b)=>a+b,0)/descs.length) + '%' : '–';
+    $('kMenor').textContent = precos.length ? brl.format(Math.min(...precos)) : '–';
+  }
+
+  function exportarCsv() {
+    const cols = ['NumeroImv','UF','Cidade','Bairro','Endereco','Preco','Avaliacao','Desconto','Financiamento','Descricao','Modalidade','AreaPrivativa','LinkAcesso'];
+    const cel = v => v == null ? '' : `"${v.toString().replace(/"/g,'""')}"`;
+    const linhas = [cols.join(';'), ...filtrados.map(r => cols.map(c => typeof r[c] === 'number' ? r[c].toString().replace('.', ',') : cel(r[c])).join(';'))];
+    const blob = new Blob(['﻿' + linhas.join('\r\n')], {type:'text/csv;charset=utf-8'});
+    const a = Object.assign(document.createElement('a'), {href: URL.createObjectURL(blob), download: 'imoveis_filtrados.csv'});
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  // Eventos
+  let t;
+  const debounce = fn => () => { clearTimeout(t); t = setTimeout(fn, 200); };
+  ['fBusca','fPrecoMin','fPrecoMax','fDesc','fArea'].forEach(id => $(id).addEventListener('input', debounce(filtrar)));
+  ['fModalidade','fFin','fFav','fBairro'].forEach(id => $(id).addEventListener('change', filtrar));
+  $('fUF').addEventListener('change', () => { atualizarCombos(); filtrar(); });
+  $('fCidade').addEventListener('change', () => { atualizarCombos(); filtrar(); });
+  $('pagTam').addEventListener('change', () => { pagina = 0; render(); });
+  $('pagAnt').addEventListener('click', () => { pagina--; render(); });
+  $('pagProx').addEventListener('click', () => { pagina++; render(); });
+  $('btCsv').addEventListener('click', exportarCsv);
+  $('btLimpar').addEventListener('click', () => {
+    document.querySelectorAll('.filtros input').forEach(i => i.type === 'checkbox' ? i.checked = false : i.value = '');
+    document.querySelectorAll('.filtros select').forEach(s => s.value = '');
+    atualizarCombos(); filtrar();
+  });
+  document.querySelectorAll('th[data-ord]').forEach(th => th.addEventListener('click', () => {
+    ordem = {col: th.dataset.ord, dir: ordem.col === th.dataset.ord ? -ordem.dir : 1};
+    ordenar(); render();
+  }));
+
+  // Carga via API REST do Supabase (PostgREST), em lotes de 1000
+  const CAMPOS = ['DataSistema','NumeroImv','UF','Cidade','Bairro','Endereco','Preco','Avaliacao','Desconto',
+                  'Financiamento','Descricao','Modalidade','Favorito','AreaPrivativa','LinkAcesso'];
+  const NUMERICOS = ['NumeroImv','Preco','Avaliacao','Desconto','Favorito','AreaPrivativa'];
+  // Aceita colunas em qualquer formato: NumeroImv, numeroimv, numero_imv...
+  const chave = k => k.toLowerCase().replace(/_/g,'');
+  const MAPA = Object.fromEntries(CAMPOS.map(c => [chave(c), c]));
+  function padronizar(r) {
+    const o = {};
+    for (const [k, v] of Object.entries(r)) o[MAPA[chave(k)] || k] = v;
+    for (const c of NUMERICOS) if (o[c] != null && o[c] !== '') o[c] = Number(o[c]);
+    for (const c of ['UF','Cidade','Bairro','Endereco','Financiamento','Descricao','Modalidade'])
+      if (typeof o[c] === 'string') o[c] = o[c].trim();
+    return o;
+  }
+
+  async function carregarSupabase() {
+    const cfg = window.SUPABASE_CONFIG || {};
+    if (!cfg.url || !cfg.anonKey || cfg.url.includes('SEU-PROJETO'))
+      throw new Error('preencha url e anonKey no arquivo config.js');
+    const base = `${cfg.url.replace(/\/$/,'')}/rest/v1/${encodeURIComponent(cfg.tabela || 'EL_IMV')}?select=*`;
+    const LOTE = 1000, linhas = [];
+    for (let ini = 0; ; ini += LOTE) {
+      $('atualizado').textContent = `Carregando… ${linhas.length.toLocaleString('pt-BR')} registros`;
+      const r = await fetch(base, { headers: {
+        apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}`,
+        Range: `${ini}-${ini + LOTE - 1}`, 'Range-Unit': 'items'
+      }});
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        try { const j = await r.json(); msg += ` – ${j.message || j.hint || ''}`; } catch {}
+        throw new Error(msg);
+      }
+      const lote = await r.json();
+      linhas.push(...lote);
+      if (lote.length < LOTE) break;
+    }
+    return linhas;
+  }
+
+  const carregar = () => carregarSupabase()
+    .then(linhas => {
+      dados = linhas.map(padronizar).map(r => ({...r,
+        _busca: norm([r.NumeroImv, r.UF, r.Cidade, r.Bairro, r.Endereco, r.Descricao, r.Modalidade].join(' '))
+      }));
+      const ult = dados.map(r => r.DataSistema).filter(Boolean).sort().pop();
+      $('atualizado').textContent = `${dados.length.toLocaleString('pt-BR')} imóveis`
+        + (ult ? ` · dados de ${new Date(ult).toLocaleString('pt-BR')}` : '');
+      if (!dados.length) $('erro').innerHTML = '<div class="erro">A consulta retornou 0 registros. Se a tabela tem dados, verifique a política RLS de leitura (veja o README).</div>';
+      preencher($('fUF'), unicos(dados, 'UF'), 'Todas');
+      preencher($('fModalidade'), unicos(dados, 'Modalidade'), 'Todas');
+      atualizarCombos();
+      filtrar();
+    })
+    .catch(e => {
+      $('atualizado').textContent = '';
+      $('erro').innerHTML = `<div class="erro">Não foi possível consultar o Supabase: ${esc(e.message)}</div>`;
+      render();
+    });
+  carregar();
+
+  // ---------- Importação do CSV da Caixa ("Lista de Imóveis da Caixa") ----------
+  // Ao importar, TODOS os registros das UFs presentes no arquivo são excluídos do
+  // Supabase e substituídos pelo conteúdo do arquivo (função importar_imoveis_csv).
+  const semAcento = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const limpar = s => (s ?? '').replace(/\s+/g, ' ').trim();
+  // "136.584,86" (padrão BR) ou "37.06" (ponto decimal, usado na coluna Desconto)
+  function numero(s) {
+    s = limpar(s);
+    if (!s) return null;
+    if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+    const n = Number(s);
+    return isNaN(n) ? null : n;
+  }
+
+  function lerTexto(buf) {
+    try { return new TextDecoder('utf-8', {fatal: true}).decode(buf); }   // UTF-8 se for válido…
+    catch { return new TextDecoder('windows-1252').decode(buf); }          // …senão o padrão da Caixa
+  }
+
+  function interpretarCsv(texto) {
+    const linhas = texto.replace(/^﻿/, '').split(/\r?\n/);
+    const iCab = linhas.findIndex(l => { const n = norm(l); return n.includes(';uf;') && n.includes('preco'); });
+    if (iCab < 0) throw new Error('cabeçalho não encontrado (esperado: Nº do imóvel;UF;Cidade;Bairro;Endereço;Preço;…)');
+    const cab = linhas[iCab].split(';').map(c => norm(c));
+    const col = nome => {
+      const i = cab.findIndex(c => c.startsWith(nome));
+      if (i < 0) throw new Error(`coluna "${nome}" não encontrada no cabeçalho`);
+      return i;
+    };
+    const ix = {num: col('n'), uf: col('uf'), cid: col('cidade'), bai: col('bairro'), end: col('endereco'),
+                pre: col('preco'), ava: col('valor de avaliacao'), des: col('desconto'), fin: col('financiamento'),
+                dsc: col('descricao'), mod: col('modalidade'), lnk: col('link')};
+    const registros = [], ignoradas = [];
+    linhas.slice(iCab + 1).forEach((l, i) => {
+      if (!l.trim()) return;
+      const c = l.split(';');
+      const numeroimv = limpar(c[ix.num]).replace(/\D/g, '');
+      const uf = limpar(c[ix.uf]).toUpperCase();
+      if (c.length < cab.length || !numeroimv || !/^[A-Z]{2}$/.test(uf)) { ignoradas.push(iCab + i + 2); return; }
+      const descricao = semAcento(limpar(c[ix.dsc]));
+      const area = descricao.match(/([\d.]+) de area privativa/i);
+      registros.push({
+        numeroimv, uf,
+        cidade: semAcento(limpar(c[ix.cid])),
+        bairro: semAcento(limpar(c[ix.bai])),
+        endereco: semAcento(limpar(c[ix.end])),
+        preco: numero(c[ix.pre]),
+        avaliacao: numero(c[ix.ava]),
+        desconto: numero(c[ix.des]),
+        financiamento: semAcento(limpar(c[ix.fin])).toUpperCase(),
+        descricao,
+        modalidade: limpar(c[ix.mod]),
+        areaprivativa: area ? Number(area[1]) : null,
+        linkacesso: limpar(c[ix.lnk])
+      });
+    });
+    return {registros, ignoradas};
+  }
+
+  let importacao = null;
+
+  $('btImportar').addEventListener('click', () => { $('arqCsv').value = ''; $('arqCsv').click(); });
+
+  $('arqCsv').addEventListener('change', async () => {
+    const arq = $('arqCsv').files[0];
+    if (!arq) return;
+    $('erro').innerHTML = '';
+    try {
+      const {registros, ignoradas} = interpretarCsv(lerTexto(await arq.arrayBuffer()));
+      if (!registros.length) throw new Error('nenhum imóvel encontrado no arquivo');
+      const ufs = [...new Set(registros.map(r => r.uf))].sort();
+      const noBanco = dados.filter(r => ufs.includes((r.UF || '').toUpperCase())).length;
+      importacao = {registros, ufs};
+      $('impResumo').innerHTML = `Arquivo <b>${esc(arq.name)}</b>: <b>${registros.length.toLocaleString('pt-BR')}</b> imóveis`
+        + ` de <b>${esc(ufs.join(', '))}</b>.`
+        + (ignoradas.length ? ` ${ignoradas.length} linha(s) inválida(s) serão ignoradas (linhas ${esc(ignoradas.slice(0, 10).join(', '))}${ignoradas.length > 10 ? '…' : ''}).` : '');
+      $('impAviso').innerHTML = `Todos os <b>${noBanco.toLocaleString('pt-BR')}</b> registros de ${esc(ufs.join(', '))} que estão hoje no banco`
+        + ` serão <b>excluídos</b> e substituídos pelo conteúdo do arquivo. Os favoritos são mantidos para os imóveis que continuarem na lista.`;
+      $('impMsg').textContent = '';
+      $('impSenha').value = '';
+      $('impConfirmar').disabled = false;
+      $('dlgImport').showModal();
+      $('impSenha').focus();
+    } catch (e) {
+      $('erro').innerHTML = `<div class="erro">Não foi possível ler o arquivo: ${esc(e.message)}</div>`;
+    }
+  });
+
+  $('impCancelar').addEventListener('click', () => { importacao = null; $('dlgImport').close(); });
+
+  $('frmImport').addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (!importacao) return;
+    const cfg = window.SUPABASE_CONFIG || {};
+    $('impConfirmar').disabled = true; $('impCancelar').disabled = true;
+    $('impMsg').textContent = 'Importando…';
+    try {
+      const r = await fetch(`${cfg.url.replace(/\/$/,'')}/rest/v1/rpc/importar_imoveis_csv`, {
+        method: 'POST',
+        headers: {apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}`, 'Content-Type': 'application/json'},
+        body: JSON.stringify({p_senha: $('impSenha').value, p_registros: importacao.registros})
+      });
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        try { const j = await r.json(); msg = j.message || j.hint || msg; } catch {}
+        if (r.status === 404) msg = 'função importar_imoveis_csv não encontrada no Supabase — rode o script supabase_importacao.sql (veja o README).';
+        throw new Error(msg);
+      }
+      const res = await r.json();
+      $('dlgImport').close();
+      importacao = null;
+      $('erro').innerHTML = `<div class="sucesso">Importação concluída (${esc((res.ufs || []).join(', '))}):`
+        + ` ${Number(res.excluidos).toLocaleString('pt-BR')} registros excluídos e`
+        + ` ${Number(res.inseridos).toLocaleString('pt-BR')} importados.</div>`;
+      await carregar();
+    } catch (e) {
+      $('impMsg').textContent = `Erro: ${e.message}`;
+      $('impConfirmar').disabled = false;
+    } finally {
+      $('impCancelar').disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
